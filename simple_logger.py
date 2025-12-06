@@ -1,4 +1,4 @@
-from io import TextIOWrapper
+from io import BufferedIOBase
 from pathlib import Path
 from threading import RLock
 from typing import Iterator
@@ -109,7 +109,7 @@ class BinaryLogger:
         """Cleanup on deletion."""
         self.close()
 
-    def __serialize(self, payload: str) -> str:
+    def __serialize(self, payload: str) -> bytes:
         """Serialize logger state to a string."""
         binary_payload = payload.encode("utf-8", errors="replace")
         binary_payload = (
@@ -117,7 +117,7 @@ class BinaryLogger:
         )
         return binary_payload
 
-    def __deserialize(self, file_handle: TextIOWrapper) -> Iterator[str]:
+    def __deserialize(self, file_handle: BufferedIOBase) -> Iterator[str]:
         """Deserialize logger state from a string."""
         while True:
             length_bytes = file_handle.read(self.length_bytesize)
