@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Test artifacts
+test_logs/
+test_logs_single/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Log files
+logs/
+*.log
+*.bin
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Other
+*.bak
+*.tmp
+logger.py
