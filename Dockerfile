@@ -2,22 +2,20 @@ FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-# Copy source files
-COPY simple_logger.py .
-COPY utilities.py .
+RUN useradd -m -u 1000 logger && \
+    chown -R logger:logger /app
 
-# Create logs directory
-RUN mkdir -p logs
+COPY --chown=logger:logger simple_logger.py .
+COPY --chown=logger:logger utilities.py .
+
+RUN mkdir -p logs && chown -R logger:logger logs
+
+USER logger
 
 FROM base AS test
 
-# Copy test files
-COPY test_simple_logger.py .
-
-# Run tests as build step (fails build if tests fail)
-RUN echo "Running basic functionality tests..." && \
-    python -m unittest test_simple_logger -v && \
-    echo "\n✅ All tests passed!"
+COPY --chown=logger:logger test_simple_logger.py .
+COPY --chown=logger:logger test_utilities.py .
 
 # Default command for test stage
 CMD ["python", "-m", "unittest", "discover", "-v"]
