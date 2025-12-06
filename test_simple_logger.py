@@ -246,7 +246,6 @@ class TestLoggerBasic(TestBase, unittest.TestCase):
         backups = get_existing_backups(log_path, sort=True)
 
         self.assertGreater(len(backups), 0, "Should have backup files")
-        print(backups)
         for i, backup in enumerate(backups):
             stem_parts = backup.stem.split(".")
             backup_num = int(stem_parts[-1])
