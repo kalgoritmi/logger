@@ -68,8 +68,18 @@ class LogState:
 class BinaryLogger:
     """
     Simple binary file logger with automatic rollover when max file size is reached.
+    Implements the context manager protocol, and is thread safe for concurrent writes.
 
-    Implements the context manager protocol, and is thread safe.
+    Each message is prefixed by its size encoded as 4 bytes, by default.
+    It can be changed to any length k, which can prefix any message up to 2 ^(k * 8) - 1 bytes.
+    It is chosen as a robust alternative to newline delimited messages, since it is delimiter invariant.
+
+    Eagerly flushes to disk after each message write, this trades off throughput for guaranteed persistence.
+    A parameter can be added to let the user choose between letting the kernel manage buffering and flushing to disk.
+
+    Rollover for backups is done when the maximum allowed file size is reached, and backups are assigned a 
+    sequential strictly increasing suffix i.e. (events.0.bin, events.1.bin, etc), while writes always happen on
+    a file handle with the original file path provided.
     """
 
     def __init__(self, file_path: Path | str, max_file_size: int):
@@ -90,7 +100,7 @@ class BinaryLogger:
             Path(file_path) if isinstance(file_path, Path) else Path(file_path)
         )
         self.__file_state = LogState(self.file_path, max_file_size)
-        self.length_bytesize = 4  # prefix length byte size
+        self.length_bytesize = 4  # prefix length byte size, messages up to 4GiB
 
     def close(self):
         """Close the logger and release file handle."""
@@ -154,7 +164,7 @@ class BinaryLogger:
 
             try:
                 self.__file_state.file_handle.write(bytes_payload)
-                self.__file_state.file_handle.flush()
+                self.__file_state.file_handle.flush()  # eagerly flush to disk after each write
 
                 current_size = self.__file_state.file_handle.tell()
                 if current_size >= self.__file_state.max_file_size:
