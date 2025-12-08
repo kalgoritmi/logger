@@ -10,6 +10,7 @@ from simple_logger import BinaryLogger
 from utilities import get_existing_backups, get_last_rollover_seq
 from test_utilities import TestBase
 
+
 class TestMultithreading(TestBase, unittest.TestCase):
     """Test thread safety of BinaryLogger."""
 

@@ -4,8 +4,10 @@ from pathlib import Path
 
 from utilities import get_existing_backups, get_last_rollover_seq
 
+
 class TestBase:
     """Testcase base class provides common setUp and tearDown fixtures."""
+
     def setUp(self):
         """Set up test directory."""
         self.test_dir = Path("./test_logs")
@@ -50,7 +52,10 @@ class TestUtilities(TestBase, unittest.TestCase):
         for i in [3, 0, 2, 1]:
             (self.test_dir / f"test.{i}.bin").touch()
         backups = get_existing_backups(log_path, sort=True)
-        self.assertEqual([b.name for b in backups], ["test.0.bin", "test.1.bin", "test.2.bin", "test.3.bin"])
+        self.assertEqual(
+            [b.name for b in backups],
+            ["test.0.bin", "test.1.bin", "test.2.bin", "test.3.bin"],
+        )
 
     def test_ignores_non_numeric(self):
         """Test `get_existing_backups`, picks only numeric sequences in backup names."""

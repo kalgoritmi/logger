@@ -29,7 +29,7 @@ class LogState:
         self.is_closed = False
 
         self.lock = RLock()
-        self.next_rollover_seq = max(get_last_rollover_seq(self.file_path)+1, 0)
+        self.next_rollover_seq = max(get_last_rollover_seq(self.file_path) + 1, 0)
 
         self.file_path.parent.mkdir(
             parents=True, exist_ok=True
@@ -77,7 +77,7 @@ class BinaryLogger:
     Eagerly flushes to disk after each message write, this trades off throughput for guaranteed persistence.
     A parameter can be added to let the user choose between letting the kernel manage buffering and flushing to disk.
 
-    Rollover for backups is done when the maximum allowed file size is reached, and backups are assigned a 
+    Rollover for backups is done when the maximum allowed file size is reached, and backups are assigned a
     sequential strictly increasing suffix i.e. (events.0.bin, events.1.bin, etc), while writes always happen on
     a file handle with the original file path provided.
     """
@@ -167,7 +167,9 @@ class BinaryLogger:
                 self.__file_state.file_handle.flush()  # eagerly flush to disk after each write
 
                 current_size = self.__file_state.file_handle.tell()
-                if current_size >= self.__file_state.max_file_size:
+                if (
+                    current_size >= self.__file_state.max_file_size
+                ):  # trade off: may overcommit past `max_file_size`
                     self.__file_state.rollover()
 
             except (OSError, IOError):
