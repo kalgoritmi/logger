@@ -14,10 +14,10 @@ A thread-safe binary file logger with automatic rollover functionality.
 
 ```bash
 # Run demo
-python simple_logger.py
+python3 simple_logger.py
 
 # Run tests
-python -m unittest discover -v
+python3 -m unittest discover -v
 ```
 
 ### Docker (Multi-Stage Build)
@@ -113,6 +113,7 @@ with BinaryLogger("./logs/tmp.bin", 1000) as logger:
 **Test Suites:**
 
 - `test_simple_logger.py`: Core functionality and edge cases
+- `test_utilities.py`: Additional testing on backup helper functions
 
 ## Requirements
 
