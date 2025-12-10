@@ -1,10 +1,15 @@
 from io import BufferedIOBase
 from pathlib import Path
 from threading import RLock
-from typing import Iterator
+from typing import Iterator, Tuple
 
 from utilities import get_existing_backups, get_last_rollover_seq
 
+class Levels:
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
 
 class LogState:
     """Manages file state and operations for a logger."""
@@ -119,15 +124,22 @@ class BinaryLogger:
         """Cleanup on deletion."""
         self.close()
 
-    def __serialize(self, payload: str) -> bytes:
-        """Serialize logger state to a string."""
+    def __serialize(self, payload: str, level: Levels) -> bytes:
+        """Serialize logger state to a string.
+        [4-bytes payload size] [4-bytes metadata size] [metadata payload] [message payload]
+        """
         binary_payload = payload.encode("utf-8", errors="replace")
-        binary_payload = (
-            len(binary_payload).to_bytes(self.length_bytesize, "big") + binary_payload
-        )
-        return binary_payload
 
-    def __deserialize(self, file_handle: BufferedIOBase) -> Iterator[str]:
+        metadata_len = len(level)
+        metadata_bytesize = metadata_len.to_bytes(self.length_bytesize, "big")
+        message_bytesize = len(binary_payload).to_bytes(self.length_bytesize, "big")
+        metadata_payload = level.encode("utf-8", errors="replace")
+        print("Wrote metadata: ", metadata_payload)
+        bytes_to_write = message_bytesize + metadata_bytesize + metadata_payload + binary_payload
+
+        return bytes_to_write
+
+    def __deserialize(self, file_handle: BufferedIOBase) -> Iterator[Tuple[str, str]]:
         """Deserialize logger state from a string."""
         while True:
             length_bytes = file_handle.read(self.length_bytesize)
@@ -135,18 +147,32 @@ class BinaryLogger:
             if len(length_bytes) == 0:
                 break  # EOF
 
+            metadata_length_bytes = file_handle.read(self.length_bytesize)
+            print("Metadta length", len(metadata_length_bytes))
             if len(length_bytes) < self.length_bytesize:
-                raise IOError("Corrupted log file: incomplete length prefix")
+                raise IOError("Corrupted log file: incomplete message length prefix")
+
+            if len(metadata_length_bytes) < self.length_bytesize:
+                raise IOError("Corrupted log file: incomplete metadata length prefix")
+
 
             length = int.from_bytes(length_bytes, "big")
+            metadata_length = int.from_bytes(metadata_length_bytes, "big")
+
+            metadata_payload_buffer = file_handle.read(metadata_length)
             payload_buffer = file_handle.read(length)
 
+            print(metadata_length, length, metadata_payload_buffer, payload_buffer)
+
+            if len(metadata_payload_buffer) != length:
+                raise IOError("Corrupted log file: incomplete metadata")
+
             if len(payload_buffer) != length:
-                raise IOError("Corrupted log file: incomplete payload")
+                raise IOError("Corrupted log file: incomplete message")
 
-            yield payload_buffer.decode("utf-8", errors="replace")
+            return (metadata_payload_buffer.decode("utf-8", errors="replace"), payload_buffer.decode("utf-8", errors="replace"))
 
-    def write(self, payload: str):
+    def write(self, payload: str, level: Levels = Levels.INFO):
         """
         Write a string payload to the log file.
 
@@ -157,7 +183,8 @@ class BinaryLogger:
             RuntimeError: If logger is closed
             IOError: If write operation fails
         """
-        bytes_payload = self.__serialize(payload)
+
+        bytes_payload = self.__serialize(payload, level)
         with self.__file_state.lock:
             if self.__file_state.is_closed:
                 raise RuntimeError("Logger is closed and cannot write logs")
@@ -178,7 +205,7 @@ class BinaryLogger:
 
     def read(
         self, file_path: Path | str | None = None, mode: str = "rb"
-    ) -> Iterator[str]:
+    ) -> Iterator[Tuple[str, str]]:
         """
         Read and iterate through payload instances from the given file,
         including its rollover backup files.
@@ -202,12 +229,16 @@ class BinaryLogger:
         path = file_path if isinstance(file_path, Path) else Path(file_path)
         existing_backups = get_existing_backups(path, sort=True)
 
+        messages = []
         for backup_path in existing_backups + [path]:
             try:
                 with open(backup_path, mode=mode) as file_handle:
-                    yield from self.__deserialize(file_handle)
+                    messages.append(self.__deserialize(file_handle))
             except (OSError, IOError):
-                continue  # skip non readable/corrupted files
+                #with self.lock:
+                #    self.write(f"OSError {backup_path}", level=Levels.WARNING)
+                raise
+        return messages
 
 
 def demo():
@@ -222,7 +253,7 @@ def demo():
 
     logger = BinaryLogger("./logs/events.bin", 1000)
     for event in events:
-        logger.write(event)
+        logger.write(event, level=Levels.INFO)
 
     iterator = logger.read("./logs/events.bin")
 
